@@ -1,0 +1,1067 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>VF Signal Detector — BetPawa Virtual Football</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #050a0f;
+    --surface:  #0b141e;
+    --card:     #0f1c2a;
+    --border:   #1a3048;
+    --accent:   #00e5ff;
+    --green:    #00ff88;
+    --red:      #ff3d5a;
+    --yellow:   #ffd400;
+    --orange:   #ff7b00;
+    --dim:      #3a5870;
+    --text:     #c8dde8;
+    --textdim:  #527a8a;
+    --glow:     0 0 18px rgba(0,229,255,0.25);
+    --glow-g:   0 0 18px rgba(0,255,136,0.25);
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 15px;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanline overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.06) 2px,
+      rgba(0,0,0,0.06) 4px
+    );
+    pointer-events: none;
+    z-index: 1000;
+  }
+
+  /* Grid background */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 0 16px; }
+
+  /* ── Header ── */
+  header {
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, rgba(0,229,255,0.04) 0%, transparent 100%);
+    padding: 14px 0;
+  }
+
+  .header-inner {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+
+  .logo {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .logo-icon {
+    width: 40px; height: 40px;
+    border: 2px solid var(--accent);
+    border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    color: var(--accent);
+    box-shadow: var(--glow);
+    animation: pulse-border 3s ease-in-out infinite;
+  }
+
+  @keyframes pulse-border {
+    0%, 100% { box-shadow: var(--glow); }
+    50% { box-shadow: 0 0 30px rgba(0,229,255,0.45); }
+  }
+
+  .logo-text { line-height: 1.2; }
+  .logo-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 18px;
+    color: var(--accent);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+  }
+  .logo-sub { font-size: 11px; color: var(--textdim); letter-spacing: 3px; text-transform: uppercase; }
+
+  .header-status {
+    display: flex; align-items: center; gap: 16px; flex-wrap: wrap;
+  }
+
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 5px 12px;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    color: var(--textdim);
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--dim);
+    transition: background 0.4s, box-shadow 0.4s;
+  }
+  .status-dot.live  { background: var(--green); box-shadow: 0 0 8px var(--green); animation: blink 1.2s ease-in-out infinite; }
+  .status-dot.error { background: var(--red); box-shadow: 0 0 8px var(--red); }
+  .status-dot.idle  { background: var(--yellow); }
+
+  @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+
+  /* ── Controls ── */
+  .controls {
+    display: flex; gap: 8px; flex-wrap: wrap;
+  }
+
+  .btn {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    padding: 7px 16px;
+    border-radius: 4px;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all 0.2s;
+    white-space: nowrap;
+  }
+
+  .btn-primary {
+    background: rgba(0,229,255,0.1);
+    border-color: var(--accent);
+    color: var(--accent);
+  }
+  .btn-primary:hover { background: rgba(0,229,255,0.2); box-shadow: var(--glow); }
+
+  .btn-success {
+    background: rgba(0,255,136,0.1);
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .btn-success:hover { background: rgba(0,255,136,0.2); box-shadow: var(--glow-g); }
+
+  .btn-danger {
+    background: rgba(255,61,90,0.1);
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .btn-danger:hover { background: rgba(255,61,90,0.2); }
+
+  .btn-warn {
+    background: rgba(255,123,0,0.1);
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* ── Main grid ── */
+  main { padding: 20px 0 40px; }
+
+  .stats-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 12px;
+    margin-bottom: 20px;
+  }
+
+  .stat-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    position: relative;
+    overflow: hidden;
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--accent), transparent);
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .stat-card:hover::before { opacity: 1; }
+
+  .stat-label {
+    font-size: 10px;
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    color: var(--textdim);
+    margin-bottom: 8px;
+  }
+
+  .stat-value {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 28px;
+    color: var(--accent);
+    line-height: 1;
+  }
+  .stat-value.green { color: var(--green); }
+  .stat-value.yellow { color: var(--yellow); }
+  .stat-value.orange { color: var(--orange); }
+
+  .stat-sub { font-size: 11px; color: var(--textdim); margin-top: 4px; }
+
+  /* ── Panels ── */
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+    margin-bottom: 20px;
+  }
+
+  @media (max-width: 800px) { .panels { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .panel-title {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: flex; align-items: center; gap: 8px;
+  }
+
+  .panel-count {
+    font-size: 11px;
+    color: var(--textdim);
+    background: var(--border);
+    border-radius: 3px;
+    padding: 2px 7px;
+  }
+
+  .panel-body { max-height: 420px; overflow-y: auto; }
+
+  /* custom scrollbar */
+  .panel-body::-webkit-scrollbar { width: 4px; }
+  .panel-body::-webkit-scrollbar-track { background: var(--surface); }
+  .panel-body::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── Pattern cards ── */
+  .pattern-item {
+    padding: 12px 16px;
+    border-bottom: 1px solid rgba(26,48,72,0.5);
+    cursor: pointer;
+    transition: background 0.15s;
+    animation: slideIn 0.3s ease;
+  }
+  .pattern-item:hover { background: rgba(0,229,255,0.03); }
+
+  @keyframes slideIn {
+    from { opacity: 0; transform: translateX(-8px); }
+    to   { opacity: 1; transform: translateX(0); }
+  }
+
+  .pattern-top {
+    display: flex; align-items: flex-start; justify-content: space-between; gap: 8px; margin-bottom: 6px;
+  }
+
+  .pattern-type {
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--textdim);
+  }
+
+  .pattern-badge {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    white-space: nowrap;
+  }
+  .badge-high   { background: rgba(0,255,136,0.15); color: var(--green); border: 1px solid rgba(0,255,136,0.3); }
+  .badge-mid    { background: rgba(255,212,0,0.15);  color: var(--yellow); border: 1px solid rgba(255,212,0,0.3); }
+  .badge-low    { background: rgba(255,61,90,0.15);  color: var(--red); border: 1px solid rgba(255,61,90,0.3); }
+
+  .pattern-desc { font-size: 14px; color: var(--text); margin-bottom: 6px; line-height: 1.4; }
+
+  .pattern-meta {
+    display: flex; gap: 12px; flex-wrap: wrap;
+  }
+
+  .meta-item {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: var(--textdim);
+    display: flex; align-items: center; gap: 4px;
+  }
+  .meta-item span { color: var(--text); }
+
+  .signal-bar-wrap {
+    margin-top: 6px;
+    height: 3px;
+    background: var(--border);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .signal-bar {
+    height: 100%;
+    border-radius: 2px;
+    transition: width 0.6s ease;
+  }
+
+  /* ── Match feed ── */
+  .match-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 16px;
+    border-bottom: 1px solid rgba(26,48,72,0.5);
+    font-size: 13px;
+    animation: slideIn 0.3s ease;
+  }
+
+  .match-teams { flex: 1; }
+  .match-score {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 15px;
+    letter-spacing: 2px;
+    padding: 0 12px;
+    color: var(--accent);
+  }
+  .match-score.over { color: var(--green); text-shadow: 0 0 8px rgba(0,255,136,0.4); }
+  .match-over35-tag {
+    font-size: 10px;
+    letter-spacing: 1px;
+    padding: 2px 6px;
+    border-radius: 3px;
+    border: 1px solid;
+  }
+  .tag-over  { color: var(--green); border-color: rgba(0,255,136,0.4); background: rgba(0,255,136,0.07); }
+  .tag-under { color: var(--dim);   border-color: rgba(58,88,112,0.4); background: transparent; }
+
+  .match-league { font-size: 11px; color: var(--textdim); }
+
+  /* ── Full-width patterns table ── */
+  .full-panel {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+    margin-bottom: 20px;
+  }
+
+  .table-wrap { overflow-x: auto; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+
+  thead th {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    color: var(--textdim);
+    padding: 10px 14px;
+    text-align: left;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+    white-space: nowrap;
+  }
+
+  tbody tr { border-bottom: 1px solid rgba(26,48,72,0.4); transition: background 0.15s; }
+  tbody tr:hover { background: rgba(0,229,255,0.03); }
+  tbody td { padding: 9px 14px; vertical-align: middle; }
+
+  .td-type {
+    font-size: 10px; letter-spacing: 1.5px; text-transform: uppercase;
+    color: var(--textdim); white-space: nowrap;
+  }
+
+  .td-desc { color: var(--text); max-width: 360px; }
+  .td-rate {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    white-space: nowrap;
+  }
+  .rate-high { color: var(--green); }
+  .rate-mid  { color: var(--yellow); }
+  .rate-low  { color: var(--red); }
+
+  .td-strength { min-width: 100px; }
+  .strength-bar { height: 5px; border-radius: 3px; background: var(--border); overflow: hidden; }
+  .strength-fill { height: 100%; border-radius: 3px; }
+
+  /* ── Downloads ── */
+  .downloads {
+    display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 20px;
+  }
+
+  .download-card {
+    flex: 1;
+    min-width: 200px;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .download-info .dl-title { font-size: 14px; font-weight: 600; color: var(--text); }
+  .download-info .dl-sub   { font-size: 11px; color: var(--textdim); margin-top: 2px; }
+
+  /* ── Log ── */
+  .log-panel {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  #log-output {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 12px;
+    line-height: 1.8;
+    padding: 12px 16px;
+    max-height: 180px;
+    overflow-y: auto;
+    color: var(--textdim);
+  }
+  .log-ts  { color: var(--dim); }
+  .log-ok  { color: var(--green); }
+  .log-err { color: var(--red); }
+  .log-inf { color: var(--accent); }
+
+  /* ── Filter bar ── */
+  .filter-bar {
+    display: flex; gap: 8px; flex-wrap: wrap; padding: 10px 16px;
+    border-bottom: 1px solid var(--border);
+    background: var(--surface);
+  }
+
+  .filter-select, .filter-input {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 13px;
+    padding: 5px 10px;
+    outline: none;
+  }
+  .filter-select:focus, .filter-input:focus { border-color: var(--accent); }
+
+  /* ── Tooltip ── */
+  .tooltip-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.7);
+    z-index: 9000;
+    align-items: center;
+    justify-content: center;
+  }
+  .tooltip-overlay.open { display: flex; }
+
+  .tooltip-box {
+    background: var(--card);
+    border: 1px solid var(--accent);
+    border-radius: 10px;
+    padding: 24px;
+    max-width: 500px;
+    width: 92%;
+    box-shadow: var(--glow);
+    animation: fadeUp 0.25s ease;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  .tooltip-close {
+    float: right;
+    cursor: pointer;
+    color: var(--textdim);
+    font-size: 20px;
+    line-height: 1;
+    margin-top: -4px;
+  }
+  .tooltip-close:hover { color: var(--red); }
+
+  /* ── Loading ── */
+  .loading-row {
+    padding: 30px 16px;
+    text-align: center;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: var(--textdim);
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 18px; height: 18px;
+    border: 2px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    vertical-align: middle;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ── Responsive ── */
+  @media (max-width: 600px) {
+    .logo-title { font-size: 14px; }
+    .stat-value { font-size: 22px; }
+    .panels { grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+
+<!-- Tooltip / Detail overlay -->
+<div class="tooltip-overlay" id="tooltip-overlay" onclick="closeTooltip(event)">
+  <div class="tooltip-box" id="tooltip-box">
+    <span class="tooltip-close" onclick="closeTooltip(null, true)">✕</span>
+    <div id="tooltip-content"></div>
+  </div>
+</div>
+
+<header>
+  <div class="wrap">
+    <div class="header-inner">
+      <div class="logo">
+        <div class="logo-icon">▶</div>
+        <div class="logo-text">
+          <div class="logo-title">VF·SIGNAL</div>
+          <div class="logo-sub">BetPawa Virtual Football Detector</div>
+        </div>
+      </div>
+      <div class="header-status">
+        <div class="status-pill">
+          <div class="status-dot idle" id="status-dot"></div>
+          <span id="status-text">IDLE</span>
+        </div>
+        <div class="status-pill" id="last-run-pill" style="display:none">
+          <span id="last-run-text">—</span>
+        </div>
+      </div>
+      <div class="controls">
+        <button class="btn btn-success" id="btn-start" onclick="startPolling()">▶ START</button>
+        <button class="btn btn-danger"  id="btn-stop"  onclick="stopPolling()" disabled>■ STOP</button>
+        <button class="btn btn-primary" id="btn-scan"  onclick="scanNow()">⟳ SCAN NOW</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+<div class="wrap">
+
+  <!-- Stats Row -->
+  <div class="stats-row">
+    <div class="stat-card">
+      <div class="stat-label">Total Matches</div>
+      <div class="stat-value" id="stat-matches">—</div>
+      <div class="stat-sub">All leagues combined</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Over 3.5 Count</div>
+      <div class="stat-value green" id="stat-over35">—</div>
+      <div class="stat-sub" id="stat-over35-rate">— of total</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Patterns Found</div>
+      <div class="stat-value yellow" id="stat-patterns">—</div>
+      <div class="stat-sub">≥10 match signals</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Leagues Tracked</div>
+      <div class="stat-value orange" id="stat-leagues">—</div>
+      <div class="stat-sub">Virtual competitions</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Collector Status</div>
+      <div class="stat-value" id="stat-status" style="font-size:16px;color:var(--textdim)">OFFLINE</div>
+      <div class="stat-sub">Background poller</div>
+    </div>
+  </div>
+
+  <!-- Downloads -->
+  <div class="downloads">
+    <div class="download-card">
+      <div class="download-info">
+        <div class="dl-title">📊 Patterns Report</div>
+        <div class="dl-sub">CSV — all detected signals</div>
+      </div>
+      <button class="btn btn-success" onclick="downloadFile('/api/download/report')">↓ CSV</button>
+    </div>
+    <div class="download-card">
+      <div class="download-info">
+        <div class="dl-title">📋 Patterns JSON</div>
+        <div class="dl-sub">Raw pattern data</div>
+      </div>
+      <button class="btn btn-primary" onclick="downloadFile('/api/download/patterns')">↓ JSON</button>
+    </div>
+    <div class="download-card">
+      <div class="download-info">
+        <div class="dl-title">📁 Matches Data</div>
+        <div class="dl-sub">All collected match results</div>
+      </div>
+      <button class="btn btn-warn" onclick="downloadFile('/api/download/matches')">↓ JSON</button>
+    </div>
+  </div>
+
+  <!-- Patterns + Matches panels -->
+  <div class="panels">
+    <!-- Recent Matches -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">⚽ Recent Matches <span class="panel-count" id="match-count">0</span></div>
+        <button class="btn btn-primary" style="padding:4px 10px;font-size:11px" onclick="loadMatches()">↻</button>
+      </div>
+      <div class="panel-body" id="match-feed">
+        <div class="loading-row">Waiting for data...</div>
+      </div>
+    </div>
+
+    <!-- Top Patterns -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">🎯 Top Signals <span class="panel-count" id="pattern-count-panel">0</span></div>
+        <button class="btn btn-primary" style="padding:4px 10px;font-size:11px" onclick="loadPatterns()">↻</button>
+      </div>
+      <div class="panel-body" id="pattern-feed">
+        <div class="loading-row">Waiting for patterns...</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- All Patterns Table -->
+  <div class="full-panel">
+    <div class="panel-header">
+      <div class="panel-title">📈 All Recorded Patterns &amp; Signals</div>
+      <span class="panel-count" id="table-count">0</span>
+    </div>
+    <!-- Filter bar -->
+    <div class="filter-bar">
+      <select class="filter-select" id="filter-type" onchange="applyFilter()">
+        <option value="">All Types</option>
+        <option value="Odds Range">Odds Range</option>
+        <option value="Team Signal">Team Signal</option>
+        <option value="League Pattern">League Pattern</option>
+        <option value="Head-to-Head">Head-to-Head</option>
+        <option value="Odds Ratio Signal">Odds Ratio</option>
+        <option value="Draw Odds Pattern">Draw Odds</option>
+        <option value="Underdog Signal">Underdog</option>
+        <option value="Scoreline Pattern">Scoreline</option>
+        <option value="Consecutive Streak">Streak</option>
+      </select>
+      <select class="filter-select" id="filter-league" onchange="applyFilter()">
+        <option value="">All Leagues</option>
+      </select>
+      <input class="filter-input" type="number" id="filter-min-rate" placeholder="Min rate %" onchange="applyFilter()" style="width:120px">
+      <input class="filter-input" type="text" id="filter-search" placeholder="Search..." oninput="applyFilter()" style="flex:1;min-width:140px">
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Type</th>
+            <th>League</th>
+            <th>Pattern / Signal</th>
+            <th>Matches</th>
+            <th>Over 3.5 %</th>
+            <th>Avg Goals</th>
+            <th>Signal Strength</th>
+          </tr>
+        </thead>
+        <tbody id="patterns-table-body">
+          <tr><td colspan="7" class="loading-row">Loading...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Log -->
+  <div class="log-panel">
+    <div class="panel-header">
+      <div class="panel-title">▸ System Log</div>
+      <button class="btn" style="padding:3px 8px;font-size:11px;border-color:var(--dim);color:var(--dim)" onclick="clearLog()">CLEAR</button>
+    </div>
+    <div id="log-output"></div>
+  </div>
+
+</div>
+</main>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let allPatterns = [];
+let pollingInterval = null;
+let statusInterval = null;
+
+// ── Utilities ─────────────────────────────────────────────────────────────
+function log(msg, type = 'inf') {
+  const out = document.getElementById('log-output');
+  const ts  = new Date().toLocaleTimeString();
+  const line = document.createElement('div');
+  line.innerHTML = `<span class="log-ts">[${ts}]</span> <span class="log-${type}">${msg}</span>`;
+  out.appendChild(line);
+  out.scrollTop = out.scrollHeight;
+  if (out.children.length > 120) out.removeChild(out.firstChild);
+}
+
+function clearLog() { document.getElementById('log-output').innerHTML = ''; }
+
+function setStatusDot(mode) {
+  const dot  = document.getElementById('status-dot');
+  const text = document.getElementById('status-text');
+  dot.className = `status-dot ${mode}`;
+  const map = { live:'LIVE', idle:'IDLE', error:'ERROR' };
+  text.textContent = map[mode] || mode.toUpperCase();
+}
+
+function downloadFile(url) {
+  log(`Initiating download: ${url}`, 'inf');
+  const a = document.createElement('a');
+  a.href  = url;
+  a.click();
+}
+
+function rateColor(rate) {
+  if (rate >= 65) return 'rate-high';
+  if (rate >= 45) return 'rate-mid';
+  return 'rate-low';
+}
+
+function strengthColor(s) {
+  if (s >= 65) return '#00ff88';
+  if (s >= 40) return '#ffd400';
+  return '#ff3d5a';
+}
+
+function badgeClass(strength) {
+  if (strength >= 65) return 'badge-high';
+  if (strength >= 40) return 'badge-mid';
+  return 'badge-low';
+}
+
+// ── API calls ──────────────────────────────────────────────────────────────
+async function api(path, method = 'GET') {
+  try {
+    const r = await fetch(path, { method });
+    if (!r.ok) throw new Error(`HTTP ${r.status}`);
+    return await r.json();
+  } catch (e) {
+    log(`API error [${path}]: ${e.message}`, 'err');
+    return null;
+  }
+}
+
+// ── Controls ───────────────────────────────────────────────────────────────
+async function startPolling() {
+  log('Starting background poller...', 'inf');
+  const r = await api('/api/start', 'POST');
+  if (r) {
+    log(r.message, 'ok');
+    document.getElementById('btn-start').disabled = true;
+    document.getElementById('btn-stop').disabled  = false;
+    setStatusDot('live');
+  }
+}
+
+async function stopPolling() {
+  const r = await api('/api/stop', 'POST');
+  if (r) {
+    log(r.message, 'inf');
+    document.getElementById('btn-start').disabled = false;
+    document.getElementById('btn-stop').disabled  = true;
+    setStatusDot('idle');
+  }
+}
+
+async function scanNow() {
+  const btn = document.getElementById('btn-scan');
+  btn.disabled = true;
+  btn.textContent = '⟳ SCANNING...';
+  log('Manual scan triggered...', 'inf');
+  const r = await api('/api/scan_now', 'POST');
+  if (r) {
+    if (r.error) {
+      log(`Scan error: ${r.error}`, 'err');
+    } else {
+      log(`Scan complete — +${r.new_matches} matches | ${r.patterns_found} patterns`, 'ok');
+      await loadAll();
+    }
+  }
+  btn.disabled = false;
+  btn.textContent = '⟳ SCAN NOW';
+}
+
+// ── Data loading ───────────────────────────────────────────────────────────
+async function loadStats() {
+  const r = await api('/api/stats');
+  if (!r) return;
+  document.getElementById('stat-matches').textContent   = r.total_matches.toLocaleString();
+  document.getElementById('stat-over35').textContent    = r.over35_count.toLocaleString();
+  document.getElementById('stat-over35-rate').textContent = `${r.over35_rate}% of total`;
+  document.getElementById('stat-patterns').textContent  = r.total_patterns.toLocaleString();
+  document.getElementById('stat-leagues').textContent   = Object.keys(r.leagues).length;
+}
+
+async function loadStatus() {
+  const r = await api('/api/status');
+  if (!r) return;
+  const dot = r.poll_running ? 'live' : 'idle';
+  setStatusDot(dot);
+  document.getElementById('stat-status').textContent  = r.status.toUpperCase();
+  document.getElementById('stat-status').style.color  = r.poll_running ? 'var(--green)' : 'var(--textdim)';
+  if (r.last_run) {
+    document.getElementById('last-run-pill').style.display = 'flex';
+    document.getElementById('last-run-text').textContent   = `Last: ${r.last_run}`;
+  }
+  document.getElementById('stat-matches').textContent = r.matches_collected.toLocaleString();
+  document.getElementById('btn-start').disabled = r.poll_running;
+  document.getElementById('btn-stop').disabled  = !r.poll_running;
+}
+
+async function loadMatches() {
+  const r = await api('/api/matches');
+  if (!r) return;
+  const feed = document.getElementById('match-feed');
+  document.getElementById('match-count').textContent = r.total;
+
+  if (!r.matches.length) {
+    feed.innerHTML = '<div class="loading-row">No matches yet. Click SCAN NOW.</div>';
+    return;
+  }
+
+  const reversed = [...r.matches].reverse();
+  feed.innerHTML = reversed.slice(0, 80).map(m => {
+    const over = m.over35;
+    const scoreClass = over ? 'match-score over' : 'match-score';
+    const tagClass   = over ? 'tag-over' : 'tag-under';
+    const tagText    = over ? 'OVER 3.5' : 'UNDER';
+    return `
+      <div class="match-item">
+        <div class="match-teams">
+          <div>${m.home_team} vs ${m.away_team}</div>
+          <div class="match-league">${m.league}</div>
+        </div>
+        <div class="${scoreClass}">${m.home_score}–${m.away_score}</div>
+        <div class="match-over35-tag ${tagClass}">${tagText}</div>
+      </div>`;
+  }).join('');
+}
+
+async function loadPatterns() {
+  const r = await api('/api/patterns');
+  if (!r) return;
+  allPatterns = r.patterns;
+  document.getElementById('pattern-count-panel').textContent = r.total;
+  document.getElementById('table-count').textContent         = r.total;
+  renderTopPatterns(allPatterns.slice(0, 20));
+  populateLeagueFilter(allPatterns);
+  applyFilter();
+}
+
+function renderTopPatterns(patterns) {
+  const feed = document.getElementById('pattern-feed');
+  if (!patterns.length) {
+    feed.innerHTML = '<div class="loading-row">No patterns yet. Collect ≥10 matches per signal.</div>';
+    return;
+  }
+  feed.innerHTML = patterns.map(p => {
+    const bClass = badgeClass(p.signal_strength);
+    const fillColor = strengthColor(p.signal_strength);
+    return `
+      <div class="pattern-item" onclick="showDetail(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+        <div class="pattern-top">
+          <div class="pattern-type">${p.type}</div>
+          <div class="pattern-badge ${bClass}">⚡ ${p.signal_strength}</div>
+        </div>
+        <div class="pattern-desc">${p.description}</div>
+        <div class="pattern-meta">
+          <div class="meta-item">MATCHES <span>${p.occurrences}</span></div>
+          <div class="meta-item">HIT RATE <span>${p.over35_rate}%</span></div>
+          <div class="meta-item">AVG GOALS <span>${p.avg_goals}</span></div>
+        </div>
+        <div class="signal-bar-wrap">
+          <div class="signal-bar" style="width:${p.signal_strength}%;background:${fillColor}"></div>
+        </div>
+      </div>`;
+  }).join('');
+}
+
+function renderTable(patterns) {
+  const tbody = document.getElementById('patterns-table-body');
+  document.getElementById('table-count').textContent = patterns.length;
+  if (!patterns.length) {
+    tbody.innerHTML = '<tr><td colspan="7" class="loading-row">No patterns match filter.</td></tr>';
+    return;
+  }
+  tbody.innerHTML = patterns.map((p, i) => {
+    const rc = rateColor(p.over35_rate);
+    const fillColor = strengthColor(p.signal_strength);
+    return `
+      <tr onclick="showDetail(${JSON.stringify(p).replace(/"/g,'&quot;')})">
+        <td class="td-type">${p.type}</td>
+        <td style="font-size:12px;color:var(--textdim)">${p.league}</td>
+        <td class="td-desc">${p.description}</td>
+        <td style="font-family:'Share Tech Mono',monospace">${p.occurrences}</td>
+        <td class="td-rate ${rc}">${p.over35_rate}%</td>
+        <td style="font-family:'Share Tech Mono',monospace">${p.avg_goals}</td>
+        <td class="td-strength">
+          <div style="font-family:'Share Tech Mono',monospace;font-size:12px;margin-bottom:4px;color:${fillColor}">${p.signal_strength}</div>
+          <div class="strength-bar"><div class="strength-fill" style="width:${p.signal_strength}%;background:${fillColor}"></div></div>
+        </td>
+      </tr>`;
+  }).join('');
+}
+
+function populateLeagueFilter(patterns) {
+  const leagues = [...new Set(patterns.map(p => p.league))].sort();
+  const sel = document.getElementById('filter-league');
+  const cur = sel.value;
+  sel.innerHTML = '<option value="">All Leagues</option>' +
+    leagues.map(l => `<option value="${l}" ${l===cur?'selected':''}>${l}</option>`).join('');
+}
+
+function applyFilter() {
+  const type    = document.getElementById('filter-type').value;
+  const league  = document.getElementById('filter-league').value;
+  const minRate = parseFloat(document.getElementById('filter-min-rate').value) || 0;
+  const search  = document.getElementById('filter-search').value.toLowerCase();
+
+  const filtered = allPatterns.filter(p => {
+    if (type   && p.type   !== type)   return false;
+    if (league && p.league !== league) return false;
+    if (p.over35_rate < minRate)       return false;
+    if (search && !p.description.toLowerCase().includes(search) &&
+                  !p.details?.toLowerCase().includes(search)) return false;
+    return true;
+  });
+  renderTable(filtered);
+}
+
+// ── Detail tooltip ─────────────────────────────────────────────────────────
+function showDetail(p) {
+  const fillColor = strengthColor(p.signal_strength);
+  const rc        = rateColor(p.over35_rate);
+  document.getElementById('tooltip-content').innerHTML = `
+    <div style="margin-bottom:14px">
+      <div style="font-family:'Share Tech Mono',monospace;font-size:11px;letter-spacing:2px;color:var(--textdim);margin-bottom:4px">${p.type}</div>
+      <div style="font-size:17px;color:var(--text);font-weight:600;line-height:1.4">${p.description}</div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:16px">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px">
+        <div style="font-size:10px;letter-spacing:2px;color:var(--textdim);margin-bottom:4px">OVER 3.5 RATE</div>
+        <div class="td-rate ${rc}" style="font-size:26px">${p.over35_rate}%</div>
+      </div>
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px">
+        <div style="font-size:10px;letter-spacing:2px;color:var(--textdim);margin-bottom:4px">SIGNAL STRENGTH</div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:26px;color:${fillColor}">${p.signal_strength}</div>
+      </div>
+    </div>
+    <div style="display:flex;gap:16px;margin-bottom:14px;flex-wrap:wrap">
+      <div class="meta-item">OCCURRENCES <span style="margin-left:5px">${p.occurrences}</span></div>
+      <div class="meta-item">AVG GOALS <span style="margin-left:5px">${p.avg_goals}</span></div>
+      <div class="meta-item">LEAGUE <span style="margin-left:5px">${p.league}</span></div>
+    </div>
+    <div style="background:var(--surface);border:1px solid var(--border);border-radius:6px;padding:12px;font-size:12px;font-family:'Share Tech Mono',monospace;color:var(--textdim);line-height:1.8">
+      ${(p.details || '').replace(/\|/g, '<br>')}
+    </div>
+    <div style="margin-top:12px">
+      <div style="font-size:10px;letter-spacing:2px;color:var(--textdim);margin-bottom:5px">SIGNAL BAR</div>
+      <div class="signal-bar-wrap" style="height:8px">
+        <div class="signal-bar" style="width:${p.signal_strength}%;background:${fillColor}"></div>
+      </div>
+    </div>`;
+  document.getElementById('tooltip-overlay').classList.add('open');
+}
+
+function closeTooltip(event, force = false) {
+  if (force || event?.target?.id === 'tooltip-overlay') {
+    document.getElementById('tooltip-overlay').classList.remove('open');
+  }
+}
+
+// ── Main init ──────────────────────────────────────────────────────────────
+async function loadAll() {
+  await Promise.all([loadStats(), loadMatches(), loadPatterns()]);
+}
+
+async function init() {
+  log('VF Signal Detector initialised.', 'ok');
+  log('Click SCAN NOW to fetch initial data, or START for auto-polling.', 'inf');
+  await loadStatus();
+  await loadAll();
+
+  // Poll status every 15s
+  statusInterval = setInterval(async () => {
+    await loadStatus();
+    await loadStats();
+  }, 15000);
+
+  // Refresh data every 60s if poller is running
+  setInterval(async () => {
+    const s = await api('/api/status');
+    if (s?.poll_running) await loadAll();
+  }, 60000);
+}
+
+init();
+</script>
+</body>
+</html>
